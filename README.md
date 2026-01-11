@@ -107,12 +107,26 @@ This is a common pattern in reactive/async libraries managing subscriptions, obs
 
 ## Analysis
 
-The crash occurs in the `MoveOnlyTypeEliminator` SIL pass, suggesting the issue is related to how the compiler handles the combination of:
-1. Actor isolation semantics
-2. `borrowing` ownership semantics
-3. Closure capture semantics
+### Why This Code Should Compile
 
-The compiler fails to handle `init_existential_ref` when the borrowed reference is captured by the closure predicate.
+The code is semantically valid and should be accepted by the compiler:
+
+1. **`borrowing` on reference types is valid**: `Subscription` is a class (reference type). A `borrowing Subscription` parameter means "this function may read the reference; it will not consume/move it." This is a valid and common ownership annotation for read-only parameters.
+
+2. **Non-escaping closure capture is allowed**: The closure passed to `removeAll` is non-escaping (evaluated synchronously during the call). Capturing a borrowed parameter in a non-escaping closure is semantically straightforward: the compiler can keep the borrow alive for the duration of the call, or materialize an owned copy of the reference if needed.
+
+3. **Actor isolation doesn't change validity**: `unsubscribe` runs on the actor, and the `removeAll` predicate closure executes within that synchronous call on the actor as well.
+
+There is no language-level rule that makes this pattern invalid.
+
+### Why This Is a Compiler Bug
+
+- A compiler crash (signal 5) during SIL processing is always a bug. A valid compiler must either emit an error or accept the program — it must not crash.
+- The minimal reproducer isolates the trigger to the combination of: actor method + `borrowing` parameter + closure capture. Removing any one condition avoids the crash, which is the signature of a compiler defect.
+
+### Technical Details
+
+The crash occurs in the `MoveOnlyTypeEliminator` SIL pass when the compiler attempts to handle `init_existential_ref` for the borrowed reference captured by the closure predicate.
 
 ## Related Issues
 
