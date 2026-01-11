@@ -113,3 +113,20 @@ The crash occurs in the `MoveOnlyTypeEliminator` SIL pass, suggesting the issue 
 3. Closure capture semantics
 
 The compiler fails to handle `init_existential_ref` when the borrowed reference is captured by the closure predicate.
+
+## Related Issues
+
+This issue appears to be novel. Related but distinct issues:
+
+| Issue | Description | Difference |
+|-------|-------------|------------|
+| [#85275](https://github.com/swiftlang/swift/issues/85275) | `~Copyable`/`~Escapable` crash with `borrowing` and closure capture | Involves noncopyable types; this bug uses regular `Sendable` class |
+| [#69252](https://github.com/swiftlang/swift/issues/69252) | `borrowing` on String causes "Copy of noncopyable typed value" error | Different error message; closed |
+| [#84568](https://github.com/swiftlang/swift/issues/84568) | Crash with `borrowing` in variadic generic closures | Different context (pack expansion crash) |
+| [#76804](https://github.com/swiftlang/swift/issues/76804) | Actor executor assumption crash with closures | Actor + closure, but no `borrowing` keyword |
+
+**Key differentiators of this bug:**
+1. Crashes specifically in `MoveOnlyTypeEliminator` SIL pass
+2. Involves `init_existential_ref` instruction failure
+3. Triggered by `borrowing` on a **reference type** (class) parameter
+4. Occurs in actor method context with closure predicate capture
